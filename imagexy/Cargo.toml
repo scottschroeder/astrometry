@@ -1,0 +1,25 @@
+[package]
+name = "imagexy"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+image = "0.23.14"
+anyhow = "1"
+thiserror = "1.0"
+log = "0.4"
+num-traits = "0.2.14"
+statrs = "0.15.0"
+# permutation = "0.2.5"
+# author hasn't pushed in a while https://github.com/jeremysalwen/rust-permutations/issues/7
+permutation = { git = "https://github.com/jeremysalwen/rust-permutations", branch = "master" }
+
+# used for a 2d median filter
+imageproc = "0.22.0"
+
+
+
+#TODO REMVOE
+random_color = "0.6.1"
