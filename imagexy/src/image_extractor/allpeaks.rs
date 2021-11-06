@@ -1,7 +1,13 @@
 use image::{GenericImageView, ImageBuffer, Luma, Primitive};
 
-use super::{dsmooth2, log_gsf, ExtractionError, LumaImage};
-use crate::{image_extractor::gaussian::max_gaussian, Point};
+use super::{dsmooth2, ExtractionError, LumaImage};
+use crate::{
+    image_extractor::{
+        gaussian::max_gaussian,
+        object_debugger::{BasicColor, ObjectImageDebugger},
+    },
+    Point,
+};
 
 struct BoundingBox {
     xmin: usize,
@@ -16,6 +22,9 @@ impl BoundingBox {
     }
     fn height(&self) -> u32 {
         (self.ymax - self.ymin + 1) as u32
+    }
+    fn contains(&self, x: usize, y: usize) -> bool {
+        x >= self.xmin && x < self.xmax && y >= self.ymin && y < self.ymax
     }
 }
 
@@ -141,6 +150,11 @@ pub(crate) fn dallpeaks<T: Primitive + Into<f32> + 'static>(
         let onx = bounding_box.xmax - bounding_box.xmin + 1;
         let ony = bounding_box.ymax - bounding_box.ymin + 1;
 
+        let obj_space = |p: Point| Point {
+            x: p.x - bounding_box.xmin as f32,
+            y: p.y - bounding_box.ymin as f32,
+        };
+
         if onx < 3 || ony < 3 {
             log::trace!(
                 "skipping object {}: too small {}x{} (x {}:{} y {}:{})",
@@ -156,7 +170,7 @@ pub(crate) fn dallpeaks<T: Primitive + Into<f32> + 'static>(
         }
 
         if onx > maxsize || ony > maxsize {
-            log::trace!(
+            log::warn!(
                 "skipping object {}: too big {}x{} (x {}:{} y {}:{})",
                 current,
                 onx,
@@ -170,16 +184,16 @@ pub(crate) fn dallpeaks<T: Primitive + Into<f32> + 'static>(
         }
 
         if peak_points.len() > maxnpeaks {
-            log::trace!(
+            log::warn!(
                 "skipping all further objects, already found max number {}",
                 maxnpeaks
             );
             break;
         }
 
-        let oimage = copy_object(img, object, &bounding_box);
+        let oimage = copy_object(img, object, &bounding_box, current);
+        let mut dbg_img = ObjectImageDebugger::new(&oimage);
         let (simage, _max_f) = dsmooth2(&oimage, dpsf);
-        log_gsf(&simage, &format!("objects/{}", current)).unwrap();
 
         let peaks = super::peaks::dpeaks(&simage, saddle, sigma, dlim, minpeak, maxnpeaks)?;
         if peaks.len() > 1 {
@@ -217,6 +231,7 @@ pub(crate) fn dallpeaks<T: Primitive + Into<f32> + 'static>(
                     x: p.x - 1.0 + this_xycen.x,
                     y: p.y - 1.0 + this_xycen.y,
                 };
+                dbg_img.add_mark(obj_space(img_point), BasicColor::Red);
                 peak_points.push(img_point);
             } else if false
                 && (xci > 1 && xci < onx as u32 - 2)
@@ -259,6 +274,7 @@ pub(crate) fn dallpeaks<T: Primitive + Into<f32> + 'static>(
                             x: 2.0 * (p.x - 1.0) + this_xycen.x,
                             y: 2.0 * (p.y - 1.0) + this_xycen.y,
                         };
+                        dbg_img.add_mark(obj_space(img_point), BasicColor::Blue);
                         peak_points.push(img_point);
                     }
                     Err(_e) => {
@@ -273,12 +289,15 @@ pub(crate) fn dallpeaks<T: Primitive + Into<f32> + 'static>(
             } else {
                 let p = max_gaussian(&oimage, dpsf, xci, yci);
                 log::trace!("max_gaussian: o:{} -> {:?}", current, p);
-                peak_points.push(Point {
+                let img_point = Point {
                     x: bounding_box.xmin as f32 + p.x,
                     y: bounding_box.ymin as f32 + p.y,
-                });
+                };
+                dbg_img.add_mark(obj_space(img_point), BasicColor::Green);
+                peak_points.push(img_point);
             }
         }
+        dbg_img.save(&format!("object_marked/{}", current)).unwrap();
     }
     Ok(peak_points)
 }
@@ -286,9 +305,10 @@ fn copy_object<T: Primitive + 'static>(
     img: &ImageBuffer<Luma<T>, Vec<T>>,
     object: &ImageBuffer<Luma<i32>, Vec<i32>>,
     bounding_box: &BoundingBox,
+    current: i32,
 ) -> ImageBuffer<Luma<T>, Vec<T>> {
     let obj_at = |x, y| object.get_pixel(x, y).0[0];
-    let current = obj_at(bounding_box.xmin as u32, bounding_box.ymin as u32);
+    // let current = obj_at(bounding_box.xmin as u32, bounding_box.ymin as u32);
 
     let mut oimage = ImageBuffer::new(bounding_box.width(), bounding_box.height());
     for oj in 0..bounding_box.height() {

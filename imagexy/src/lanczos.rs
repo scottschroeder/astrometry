@@ -1,6 +1,5 @@
 use crate::image_extractor::LumaImage;
 use image::Primitive;
-use num_traits::Float;
 use std::f64::consts::PI;
 
 fn lanczos(x: f64, window: f64) -> f64 {

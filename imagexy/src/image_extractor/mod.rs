@@ -1,7 +1,6 @@
 use anyhow::Result;
-use image::{GenericImageView, ImageBuffer, Luma, Pixel, Primitive};
-use imageproc::drawing::Canvas;
-use num_traits::{Float, NumCast};
+use image::{ImageBuffer, Luma, Pixel, Primitive};
+use num_traits::NumCast;
 use std::{collections::HashMap, fmt::Debug, path::PathBuf};
 use thiserror::Error;
 
@@ -14,6 +13,8 @@ mod allpeaks;
 mod gaussian;
 mod label;
 mod peaks;
+
+mod object_debugger;
 
 const SIMPLEXY_DEFAULT_DPSF: f32 = 1.0;
 const SIMPLEXY_DEFAULT_PLIM: f32 = 8.0;
