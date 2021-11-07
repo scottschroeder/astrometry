@@ -1,42 +1,35 @@
+pub(crate) use self::gaussian::max_gaussian;
+use crate::{image_extractor::peaks::dallpeaks, lanczos::lanczos_resample, ImageDebugger, Point};
 use anyhow::Result;
 use image::{ImageBuffer, Luma, Pixel, Primitive};
 use num_traits::NumCast;
 use std::{collections::HashMap, fmt::Debug, path::PathBuf};
 use thiserror::Error;
 
-pub(crate) use self::gaussian::max_gaussian;
-use crate::{lanczos::lanczos_resample, Point};
-
-use crate::image_extractor::allpeaks::dallpeaks;
-
-mod allpeaks;
+mod flatten;
 mod gaussian;
 mod label;
 mod peaks;
 
-mod object_debugger;
-
-const SIMPLEXY_DEFAULT_DPSF: f32 = 1.0;
-const SIMPLEXY_DEFAULT_PLIM: f32 = 8.0;
-const SIMPLEXY_DEFAULT_DLIM: f32 = 1.0;
-const SIMPLEXY_DEFAULT_SADDLE: f32 = 5.0;
+const SIMPLEXY_DEFAULT_DPSF: f64 = 1.0;
+const SIMPLEXY_DEFAULT_PLIM: f64 = 8.0;
+const SIMPLEXY_DEFAULT_DLIM: f64 = 1.0;
+const SIMPLEXY_DEFAULT_SADDLE: f64 = 5.0;
 const SIMPLEXY_DEFAULT_MAXPER: u32 = 1000;
 const SIMPLEXY_DEFAULT_MAXSIZE: u32 = 2000;
 const SIMPLEXY_DEFAULT_HALFBOX: u32 = 100;
 const SIMPLEXY_DEFAULT_MAXNPEAKS: usize = 100000;
 
-const SIMPLEXY_U8_DEFAULT_PLIM: f32 = 4.0;
-const SIMPLEXY_U8_DEFAULT_SADDLE: f32 = 2.0;
+const SIMPLEXY_U8_DEFAULT_PLIM: f64 = 4.0;
+const SIMPLEXY_U8_DEFAULT_SADDLE: f64 = 2.0;
 const DSIGMA_DEFAULT_GRIDSIZE: u32 = 20;
 
 #[derive(Error, Debug)]
 pub enum ExtractionError {
-    // #[error("data store disconnected")]
-    // Disconnect(#[from] io::Error),
     #[error(
         "no significant pixels, significace threshold = {limit}, max value in image = {max_value}"
     )]
-    NoSignificantPixels { limit: f32, max_value: f32 },
+    NoSignificantPixels { limit: f64, max_value: f64 },
     #[error("ran out of labels for objects")]
     ExhaustedLabels,
     #[error("unable to find peak")]
@@ -47,24 +40,30 @@ pub enum ExtractionError {
     PeakBadFloat,
 }
 
+#[derive(Debug, Default)]
+pub struct ImageDebugConfig {
+    pub background_subtracted_image: Option<PathBuf>,
+    pub smooth_background_subtracted_image: Option<PathBuf>,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct Source {
     pub point: Point,
-    pub flux: f32,
-    pub background: f32,
+    pub flux: f64,
+    pub background: f64,
 }
 
 /// Settings for how the star xy points should be extracted from
 /// an image.
 pub struct ImageExtractor {
     /// gaussian psf width (sigma, not FWHM)
-    pub dpsf: f32,
+    pub dpsf: f64,
     /// significance to keep
-    pub plim: f32,
+    pub plim: f64,
     /// closest two peaks can be
-    pub dlim: f32,
+    pub dlim: f64,
     /// saddle difference (in sig)
-    pub saddle: f32,
+    pub saddle: f64,
     /// maximum number of peaks per object
     pub maxper: u32,
     /// maximum number of peaks total
@@ -78,7 +77,7 @@ pub struct ImageExtractor {
     pub nobgsub: bool,
 
     // global background.
-    pub globalbg: f32,
+    pub globalbg: f64,
 
     // invert the image before processing (for black-on-white images)
     pub invert: bool,
@@ -89,42 +88,10 @@ pub struct ImageExtractor {
 
     // If set, the given sigma value will be used;
     // otherwise a value will be estimated.
-    pub sigma: Option<f32>,
+    pub sigma: Option<f64>,
+
+    pub debug: ImageDebugConfig,
 }
-
-pub struct DebugImageWriter {
-    pub inverted: Option<PathBuf>,
-}
-
-impl DebugImageWriter {
-    // fn save_image(&self, img: &image::ImageBuffer<>, kind: DebugImageKind) -> Result<()> {
-    //     let opt_path = match kind {
-    //         DebugImageKind::Inverted => self.inverted,
-    //         DebugImageKind::Background => todo!(),
-    //         DebugImageKind::Mask => todo!(),
-    //         DebugImageKind::Blob => todo!(),
-    //         DebugImageKind::BackgroundSub => todo!(),
-    //         DebugImageKind::Smooth => todo!(),
-    //     }.as_ref();
-
-    //     img
-
-    //     if let Some(p) = opt_path {
-    //     }
-
-    //     Ok(())
-    // }
-}
-
-enum DebugImageKind {
-    Inverted,
-    Background,
-    Mask,
-    Blob,
-    BackgroundSub,
-    Smooth,
-}
-
 impl Default for ImageExtractor {
     fn default() -> Self {
         Self {
@@ -141,13 +108,13 @@ impl Default for ImageExtractor {
             invert: false,
             lanczos_window: None,
             sigma: None,
+            debug: ImageDebugConfig::default(),
         }
     }
 }
 
 pub(crate) type LumaImage<T> = image::ImageBuffer<image::Luma<T>, Vec<T>>;
 type Grayscale = LumaImage<u8>;
-type GrayscaleFloat = LumaImage<f32>;
 
 pub fn invert(img: &mut Grayscale) {
     image::imageops::invert(img);
@@ -175,9 +142,19 @@ fn dump_colored_objects(img: &ImageBuffer<Luma<i32>, Vec<i32>>, name: &str) -> R
     Ok(())
 }
 
+fn log_image<T: Primitive + 'static, P: AsRef<std::path::Path>>(
+    img: &LumaImage<T>,
+    path: Option<P>,
+) -> anyhow::Result<()> {
+    if let Some(p) = path {
+        ImageDebugger::new(img).save(p)
+    } else {
+        Ok(())
+    }
+}
+
 impl ImageExtractor {
     pub(crate) fn run(&self, img: &mut Grayscale) -> Result<Vec<Source>> {
-        // log::trace!("{:?}", img);
         if self.invert {
             invert(img)
         }
@@ -185,16 +162,24 @@ impl ImageExtractor {
         let flattened_bg = if self.nobgsub {
             todo!("dont do background smoothing")
         } else {
-            self.flatten(&img)?
+            flatten::flatten(&img, self.halfbox)?
         };
+        log_image(
+            &flattened_bg,
+            self.debug.background_subtracted_image.as_ref(),
+        )?;
 
         let smooth = self.smoothing(&flattened_bg)?;
+        log_image(
+            &smooth,
+            self.debug.smooth_background_subtracted_image.as_ref(),
+        )?;
 
         let sigma = dsigma(&smooth, 5, None);
         log::debug!("image sigma: {}", sigma);
 
         let limit =
-            (sigma / (std::f32::consts::FRAC_2_SQRT_PI * self.dpsf)) * self.plim + self.globalbg;
+            (sigma / (std::f64::consts::FRAC_2_SQRT_PI * self.dpsf)) * self.plim + self.globalbg;
 
         let mask = dmask(&smooth, limit, self.dpsf)?;
 
@@ -225,7 +210,7 @@ impl ImageExtractor {
         Ok(sources)
     }
 
-    fn levels<T: Primitive + Into<f32> + 'static>(
+    fn levels<T: Primitive + Into<f64> + 'static>(
         &self,
         img: &LumaImage<T>,
         flat: &LumaImage<T>,
@@ -235,8 +220,8 @@ impl ImageExtractor {
         for point in peaks.iter().cloned() {
             let ix = (point.x + 0.5) as u32;
             let iy = (point.y + 0.5) as u32;
-            let mut flux: f32 = flat.get_pixel(ix, iy).0[0].into();
-            let mut background: f32 = img.get_pixel(ix, iy).0[0].into() - flux;
+            let mut flux: f64 = flat.get_pixel(ix, iy).0[0].into();
+            let mut background: f64 = img.get_pixel(ix, iy).0[0].into() - flux;
             flux -= self.globalbg;
             background += self.globalbg;
 
@@ -250,7 +235,7 @@ impl ImageExtractor {
         sources
     }
 
-    fn lanczos_levels<T: Primitive + Into<f64> + Into<f32> + 'static>(
+    fn lanczos_levels<T: Primitive + Into<f64> + Into<f64> + 'static>(
         &self,
         img: &LumaImage<T>,
         flat: &LumaImage<T>,
@@ -260,9 +245,9 @@ impl ImageExtractor {
         let mut sources = Vec::with_capacity(peaks.len());
         for point in peaks.iter().cloned() {
             let mut flux =
-                lanczos_resample(flat, point.x as f64, point.y as f64, window, false) as f32;
+                lanczos_resample(flat, point.x as f64, point.y as f64, window, false) as f64;
             let mut background =
-                lanczos_resample(img, point.x as f64, point.y as f64, window, false) as f32 - flux;
+                lanczos_resample(img, point.x as f64, point.y as f64, window, false) as f64 - flux;
             flux -= self.globalbg;
             background += self.globalbg;
 
@@ -275,47 +260,16 @@ impl ImageExtractor {
 
         sources
     }
-    fn flatten(&self, img: &Grayscale) -> Result<Grayscale> {
-        let min_xy = std::cmp::min(img.width(), img.height());
-        let mut halfbox = self.halfbox;
-        if min_xy < 2 * self.halfbox + 1 {
-            halfbox = (((min_xy as f32) - 1.0) / 2.0).floor() as u32;
-        }
-        // TODO I think tighter filters produces better results, but I'll trust the PhDs
-        // halfbox /= 4;
-        assert!(min_xy >= 2 * halfbox + 1);
-        log::trace!("apply median filter");
-        // TODO faster implementations exist
-        let mut median_filtered = imageproc::filter::median_filter(img, halfbox, halfbox);
-        median_filtered.save("median_filter.jpg")?;
-
-        for (m, i) in median_filtered.pixels_mut().zip(img.pixels()) {
-            let img_ch = i.channels4();
-            let med_ch = m.channels4();
-
-            let f = if med_ch.0 >= img_ch.0 {
-                0
-            } else {
-                img_ch.0 - med_ch.0
-            };
-
-            *m = Pixel::from_channels(f, 255, 255, 255);
-        }
-
-        median_filtered.save("median_flattened.jpg")?;
-        Ok(median_filtered)
-    }
 
     fn smoothing(&self, img: &Grayscale) -> Result<Grayscale> {
         log::trace!("smoothing image");
         let (smooth, max_pixel) = dsmooth2(img, self.dpsf);
         let export_smooth = grayf2u8(&smooth, max_pixel);
-        export_smooth.save("gaussian_smooth.jpg")?;
         Ok(export_smooth)
     }
 }
 
-fn grayf2u8(img: &GrayscaleFloat, max_pixel: f32) -> Grayscale {
+fn grayf2u8(img: &LumaImage<f64>, max_pixel: f64) -> Grayscale {
     let (width, height) = img.dimensions();
     let mut out = Grayscale::new(width, height);
 
@@ -328,13 +282,6 @@ fn grayf2u8(img: &GrayscaleFloat, max_pixel: f32) -> Grayscale {
     }
 
     out
-}
-
-fn log_gsf(img: &GrayscaleFloat, name: &str) -> Result<()> {
-    let max = luma_max(img);
-    let g = grayf2u8(img, max);
-    g.save(format!("{}.jpg", name))?;
-    Ok(())
 }
 
 fn luma_apply_mask<T: Primitive + 'static>(
@@ -371,7 +318,7 @@ fn luma_max<T: Primitive + 'static>(img: &ImageBuffer<Luma<T>, Vec<T>>) -> T {
         .unwrap_or(T::zero())
 }
 
-fn dsmooth2<T: Primitive + 'static>(img: &LumaImage<T>, sigma: f32) -> (GrayscaleFloat, f32) {
+fn dsmooth2<T: Primitive + 'static>(img: &LumaImage<T>, sigma: f64) -> (LumaImage<f64>, f64) {
     let npix = 2 * ((3.0 * sigma).ceil() as usize + 1);
     let half = (npix / 2) as i32;
 
@@ -380,7 +327,7 @@ fn dsmooth2<T: Primitive + 'static>(img: &LumaImage<T>, sigma: f32) -> (Grayscal
     let mut total = 0.0;
     let mut kernel_1d = (0..npix)
         .map(|idx| {
-            let dx = idx as f32 - 0.5 * (npix as f32 - 1.0);
+            let dx = idx as f64 - 0.5 * (npix as f64 - 1.0);
             let k = (dx * dx * neghalfinvvar).exp();
             total += k;
             k
@@ -392,7 +339,7 @@ fn dsmooth2<T: Primitive + 'static>(img: &LumaImage<T>, sigma: f32) -> (Grayscal
     }
 
     log::trace!("smoothing image {:?} npix:{}", img.dimensions(), npix);
-    let mut smooth = GrayscaleFloat::new(img.width(), img.height());
+    let mut smooth = LumaImage::new(img.width(), img.height());
 
     let width_max = (img.width() - 1) as i32;
     let height_max = (img.height() - 1) as i32;
@@ -407,17 +354,17 @@ fn dsmooth2<T: Primitive + 'static>(img: &LumaImage<T>, sigma: f32) -> (Grayscal
             let sum = (start..end)
                 .map(|sample| {
                     let base_idx = sample - idx + half;
-                    let p: f32 = NumCast::from(img.get_pixel(sample as u32, row).channels4().0)
+                    let p: f64 = NumCast::from(img.get_pixel(sample as u32, row).channels4().0)
                         .expect("could not convert to float");
                     let o = p * kernel_1d[base_idx as usize];
                     o
                 })
-                .sum::<f32>();
+                .sum::<f64>();
             smooth.put_pixel(col, row, Pixel::from_channels(sum, 1.0, 1.0, 1.0))
         }
     }
 
-    let mut smoothbuf = Vec::<f32>::with_capacity(img.height() as usize);
+    let mut smoothbuf = Vec::<f64>::with_capacity(img.height() as usize);
     // convolve y
     for col in 0..img.width() {
         for row in 0..img.height() {
@@ -428,12 +375,12 @@ fn dsmooth2<T: Primitive + 'static>(img: &LumaImage<T>, sigma: f32) -> (Grayscal
                 .map(|sample| {
                     let base_idx = sample - idx + half;
                     // log::trace!("input[{}] * kernel[{}]", sample, base_idx);
-                    let p = smooth.get_pixel(col, sample as u32).channels4().0 as f32;
+                    let p = smooth.get_pixel(col, sample as u32).channels4().0 as f64;
                     let o = p * kernel_1d[base_idx as usize];
                     // log::trace!("p:{} k:{} o:{}", p, kernel_1d[base_idx as usize], o);
                     o
                 })
-                .sum::<f32>();
+                .sum::<f64>();
             smoothbuf.push(sum);
         }
         for (row, sum) in smoothbuf.iter().enumerate() {
@@ -448,7 +395,7 @@ fn dsmooth2<T: Primitive + 'static>(img: &LumaImage<T>, sigma: f32) -> (Grayscal
     (smooth, max_pixel)
 }
 
-fn dmask(img: &Grayscale, limit: f32, dpsf: f32) -> Result<Grayscale> {
+fn dmask(img: &Grayscale, limit: f64, dpsf: f64) -> Result<Grayscale> {
     let mut mask = Grayscale::new(img.width(), img.height());
 
     let mut flagged_one = false;
@@ -467,7 +414,7 @@ fn dmask(img: &Grayscale, limit: f32, dpsf: f32) -> Result<Grayscale> {
     for row in 0..img.height() {
         let (rlow, rhi) = bounding_box(img.height(), row);
         for col in 0..img.width() {
-            let p = img.get_pixel(col, row).channels4().0 as f32;
+            let p = img.get_pixel(col, row).channels4().0 as f64;
             if p < limit {
                 continue;
             }
@@ -483,13 +430,13 @@ fn dmask(img: &Grayscale, limit: f32, dpsf: f32) -> Result<Grayscale> {
 
     if !flagged_one {
         // no mask
-        let max_value = luma_max(img) as f32;
+        let max_value = luma_max(img) as f64;
         Err(ExtractionError::NoSignificantPixels { limit, max_value }.into())
     } else {
         Ok(mask)
     }
 }
-fn dsigma(img: &Grayscale, sp: u32, gridsize: Option<u32>) -> f32 {
+fn dsigma(img: &Grayscale, sp: u32, gridsize: Option<u32>) -> f64 {
     if img.dimensions() == (1, 1) {
         return 0.0;
     }
@@ -517,15 +464,15 @@ fn dsigma(img: &Grayscale, sp: u32, gridsize: Option<u32>) -> f32 {
     log::trace!("sampling sigma at {} points", ndiff);
     for jdx in (0..img.height() - sp).step_by(dy as usize) {
         for idx in (0..img.width() - sp).step_by(dx as usize) {
-            let lhs = img.get_pixel(idx, jdx).channels4().0 as f32;
-            let rhs = img.get_pixel(idx + sp, jdx + sp).channels4().0 as f32;
+            let lhs = img.get_pixel(idx, jdx).channels4().0 as f64;
+            let rhs = img.get_pixel(idx + sp, jdx + sp).channels4().0 as f64;
             diff.push((lhs - rhs).abs());
         }
     }
     assert_eq!(diff.len(), ndiff);
 
     if ndiff <= 10 {
-        return diff.iter().map(|d| d * d).sum::<f32>() / ndiff as f32;
+        return diff.iter().map(|d| d * d).sum::<f64>() / ndiff as f64;
     }
 
     let mut n_sigma = 0.7f64; // ?
@@ -549,7 +496,7 @@ fn dsigma(img: &Grayscale, sp: u32, gridsize: Option<u32>) -> f32 {
         log::trace!("n_sigma={}, s={}", n_sigma, s);
         n_sigma += 0.1;
     }
-    s as f32
+    s as f64
 }
 
 #[cfg(test)]
@@ -564,6 +511,6 @@ mod tests {
         };
 
         assert_eq!(obj.dlim, 3.14);
-        assert_eq!(obj.plim, 8.0);
+        assert_eq!(obj.plim, SIMPLEXY_DEFAULT_PLIM);
     }
 }

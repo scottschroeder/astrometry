@@ -1,33 +1,17 @@
 #![allow(dead_code)] // TODO remove
 
-use image::{GenericImage, GenericImageView, Pixel};
-
 use crate::image_extractor::ImageExtractor;
+use image::{GenericImage, GenericImageView, Pixel};
+pub(crate) use object_debugger::ImageDebugger;
+pub use point::Point;
 
 mod image_extractor;
 mod lanczos;
 mod loader;
+mod object_debugger;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct Point {
-    pub x: f32,
-    pub y: f32,
-}
-
-impl Point {
-    fn new(x: f32, y: f32) -> Point {
-        Point { x, y }
-    }
-}
-
-impl<X: Into<f32>, Y: Into<f32>> From<(X, Y)> for Point {
-    fn from((x, y): (X, Y)) -> Self {
-        Point {
-            x: x.into(),
-            y: y.into(),
-        }
-    }
-}
+pub(crate) mod canvas;
+pub(crate) mod point;
 
 pub fn demo(p: &str) -> anyhow::Result<()> {
     let mut d = loader::load_from_path(p)?;
@@ -44,7 +28,7 @@ pub fn demo(p: &str) -> anyhow::Result<()> {
     };
     let s = extractor.run(&mut g)?;
 
-    for star in s {
+    for star in &s {
         let x = (star.point.x).floor() as i32;
         let y = (star.point.y).floor() as i32;
 
@@ -67,6 +51,8 @@ pub fn demo(p: &str) -> anyhow::Result<()> {
     }
 
     d.save("stars.png")?;
+
+    println!("{:#?}", s);
 
     Ok(())
 }

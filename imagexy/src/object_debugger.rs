@@ -1,7 +1,7 @@
 use crate::Point;
 use num_traits::NumCast;
 
-use super::LumaImage;
+use crate::image_extractor::LumaImage;
 use image::{ImageBuffer, Pixel, Primitive, Rgba};
 
 #[derive(Debug, Clone, Copy)]
@@ -21,16 +21,18 @@ impl BasicColor {
     }
 }
 
-pub(crate) struct ObjectImageDebugger<'a, T: Primitive + 'static> {
+pub(crate) struct ImageDebugger<'a, T: Primitive + 'static> {
     inner: &'a LumaImage<T>,
     marks: Vec<(Point, BasicColor)>,
+    cross_size: Option<usize>,
 }
 
-impl<'a, T: Primitive + 'static> ObjectImageDebugger<'a, T> {
-    pub(crate) fn new(img: &'a LumaImage<T>) -> ObjectImageDebugger<'a, T> {
-        ObjectImageDebugger {
+impl<'a, T: Primitive + 'static> ImageDebugger<'a, T> {
+    pub(crate) fn new(img: &'a LumaImage<T>) -> ImageDebugger<'a, T> {
+        ImageDebugger {
             inner: img,
             marks: vec![],
+            cross_size: None,
         }
     }
 
@@ -38,17 +40,35 @@ impl<'a, T: Primitive + 'static> ObjectImageDebugger<'a, T> {
         self.marks.push((p, c))
     }
 
-    pub(crate) fn save(&self, name: &str) -> anyhow::Result<()> {
-        let img = self.create_printable_image();
+    pub(crate) fn set_cross_size(&mut self, size: usize) {
+        self.cross_size = Some(size)
+    }
 
-        img.save(format!("{}.png", name))?;
+    pub(crate) fn save<P: AsRef<std::path::Path>>(&self, name: P) -> anyhow::Result<()> {
+        let p = name.as_ref();
+        let p = if p.extension().is_none() {
+            p.with_extension("png")
+        } else {
+            p.to_owned()
+        };
+        let img = self.create_printable_image();
+        if let Some(parent) = p.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        img.save(p)?;
         Ok(())
+    }
+
+    fn auto_size_cross(&self) -> usize {
+        let scale = std::cmp::min(self.inner.height(), self.inner.height()) as usize;
+        scale / 100
     }
 
     fn create_printable_image(&self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
         let (width, height) = self.inner.dimensions();
         let mut out = ImageBuffer::new(width, height);
 
+        let cross_size = self.cross_size.unwrap_or_else(|| self.auto_size_cross());
         let crosses = self
             .marks
             .iter()
@@ -56,7 +76,7 @@ impl<'a, T: Primitive + 'static> ObjectImageDebugger<'a, T> {
                 x: (p.x + 0.5) as i32,
                 y: (p.y + 0.5) as i32,
                 color: *c,
-                length: 0,
+                length: cross_size as i32,
             })
             .collect::<Vec<_>>();
 

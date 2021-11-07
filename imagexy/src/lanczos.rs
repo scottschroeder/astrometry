@@ -28,10 +28,6 @@ pub(crate) fn lanczos_resample<T: Primitive + Into<f64> + 'static>(
     let nx = 1 + x1 - x0;
     let ny = 1 + y1 - y0;
 
-    // // TODO these asserts seem like they will get hit and be very confusing
-    // assert!(nx < 12, "window must be less than 12");
-    // assert!(ny < 12, "window must be less than 12");
-
     let ky = (0..ny)
         .map(|dy| lanczos(py - (y0 + dy) as f64, window))
         .collect::<Vec<_>>();

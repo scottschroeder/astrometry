@@ -66,8 +66,8 @@ pub(crate) fn dfind<T: Primitive + 'static>(
 
     for iy in 0..img.height() {
         for ix in 0..img.width() {
-            object.put_pixel(ix, iy, Label::default().to_pixel());
             if is_zero(img, ix, iy) {
+                object.put_pixel(ix, iy, Label::default().to_pixel());
                 continue;
             }
             on_pixels.push((ix, iy));
