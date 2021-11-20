@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 imagexy = {path = "../imagexy"}
+index = {path = "../index"}
 
 clap = "3.0.0-beta.5"
 color-backtrace = { version = "0.5" }

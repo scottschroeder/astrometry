@@ -112,10 +112,8 @@ impl Cross {
     fn is_cross(&self, x: i32, y: i32) -> bool {
         if x == self.x && (y >= self.y - self.length && y <= self.y + self.length) {
             true
-        } else if y == self.y && (x >= self.x - self.length && x <= self.x + self.length) {
-            true
         } else {
-            false
+            y == self.y && (x >= self.x - self.length && x <= self.x + self.length)
         }
     }
 }

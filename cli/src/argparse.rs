@@ -16,12 +16,18 @@ pub struct CliOpts {
 #[derive(Parser, Debug)]
 pub enum SubCommand {
     DemoImageXY(DemoImageXY),
+    DemoIndex(DemoIndex),
     Gaussian(Gaussian),
     Test(Test),
 }
 
 #[derive(Parser, Debug)]
 pub struct DemoImageXY {
+    pub path: String,
+}
+#[derive(Parser, Debug)]
+pub struct DemoIndex {
+    #[clap(about = "path to astrometry.net fits file")]
     pub path: String,
 }
 

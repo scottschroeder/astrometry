@@ -1,0 +1,19 @@
+[package]
+name = "index"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+thiserror = "1.0"
+log = "0.4"
+byteorder = "1"
+bytemuck = "1.7"
+strum = { version = "0.22", features = ["derive"] }
+
+
+
+# fitsio = { version = "0.19.0", features = ["fitsio-src"]}
+fits-rs = { path = "../../fits-rs" }
