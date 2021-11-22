@@ -1,7 +1,9 @@
 use super::{
+    bits::kdtree_nnodes_to_nlevels,
     error::Error,
     kd_types::{KdtData, KdtExt, KdtMetadata, KdtTree, KdtType},
     tree::DimSplit,
+    tree::TreeCut,
 };
 use crate::kdtree::tree::KDRange;
 use crate::kdtree::tree::KDTree;
@@ -95,7 +97,6 @@ impl<'a> FitsFileMap<'a> {
             .find_table_column(tablename)
             .ok_or_else(|| Error::MissingTable(tablename.to_string()))?;
 
-
         if nrows != c.rows {
             log::error!(
                 "table {} expected {} data items (rows) found {}",
@@ -188,22 +189,22 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
 
     if bb_data.is_ok() {
         todo!("nothing is implemented for bounding boxes");
-    //     let nbb_old = (metadata.nnodes + 1) / 2 - 1;
-    //     let nbb_new = metadata.nnodes;
+        //     let nbb_old = (metadata.nnodes + 1) / 2 - 1;
+        //     let nbb_new = metadata.nnodes;
 
-    //     if bb_chunk.nrows == nbb_new {
-    //     } else if bb_chunk.nrows == nbb_old {
-    //         log::warn!(
-    //             "This file contains an old, buggy {} extension, it has {} rather than {} items. This will probably cause problems!",
-    //             bb_chunk.tablename, nbb_old, nbb_new
-    //         );
-    //     } else {
-    //         log::error!(
-    //             "bounding box table {} should contain either {} (new) or {} (old) bounding boxes, but it has {}",
-    //             bb_chunk.tablename, nbb_old, nbb_new, bb_chunk.nrows
-    //         );
-    //         return Err(Error::InvalidTableDimmensions);
-    //     }
+        //     if bb_chunk.nrows == nbb_new {
+        //     } else if bb_chunk.nrows == nbb_old {
+        //         log::warn!(
+        //             "This file contains an old, buggy {} extension, it has {} rather than {} items. This will probably cause problems!",
+        //             bb_chunk.tablename, nbb_old, nbb_new
+        //         );
+        //     } else {
+        //         log::error!(
+        //             "bounding box table {} should contain either {} (new) or {} (old) bounding boxes, but it has {}",
+        //             bb_chunk.tablename, nbb_old, nbb_new, bb_chunk.nrows
+        //         );
+        //         return Err(Error::InvalidTableDimmensions);
+        //     }
     }
 
     let split_data = filemap.read_chunk::<T>(
@@ -224,13 +225,9 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
         metadata.ndim,
     );
 
-    let range_tablename =get_table_name(treename, KD_STR_RANGE);
+    let range_tablename = get_table_name(treename, KD_STR_RANGE);
     let kdr = filemap
-        .read_chunk::<f64>(
-            range_tablename.as_str(),
-            metadata.ndim * 2 + 1,
-            1,
-        )
+        .read_chunk::<f64>(range_tablename.as_str(), metadata.ndim * 2 + 1, 1)
         .map(|range| {
             let scale_idx = metadata.ndim * 2;
             let scale = range[scale_idx];
@@ -248,21 +245,25 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
             kdr
         });
 
-    if split_data.is_ok() {
-        if splitdim_data.is_ok() {
-            let splitmask = u32::MAX;
-        } else {
-            let mask = compute_splitbits(metadata.ndim as u32);
-        }
-    }
+    let split_data = split_data?;
+    let splitdim_data = splitdim_data?;
+    let mask = compute_splitbits(metadata.ndim as u32);
 
-    // Ok(KDTree {
-    //     metadata,
-    //     bb: todo!(),
-    //     split: bytemuck::cast_slice(a)
-    //     data: bytemuck::cast_slice(data_data),
-    // })
-    todo!()
+    Ok(KDTree {
+        metadata,
+        lr: lr_data?,
+        perm: perm_data?,
+        cut: TreeCut::SplitDim {
+            data: split_data,
+            mask,
+        },
+        data: data_data?,
+        splitdim: splitdim_data,
+        minval: todo!(),
+        maxval: todo!(),
+        scale: todo!(),
+        invscale: todo!(),
+    })
 }
 
 fn compute_splitbits(ndim: u32) -> DimSplit {
@@ -363,7 +364,7 @@ fn is_tree_header_ok(header: &Header, style: TreeStyle) -> Result<KdtMetadata, E
     fits_check_endian(header)?;
 
     let has_linear_lr = header_get_bool(header, "KDT_LINL").unwrap_or(false);
-    let nlevels = kdtree_nnodes_to_nlevels(nnodes as u32);
+    let nlevels = kdtree_nnodes_to_nlevels(nnodes);
     let nbottom = (nnodes + 1) / 2;
     let ninterior = nnodes - nbottom;
 
@@ -406,23 +407,6 @@ fn fits_generate_endian_string<O: byteorder::ByteOrder>() -> String {
         "{:02x}:{:02x}:{:02x}:{:02x}",
         wtr[0], wtr[1], wtr[2], wtr[3],
     )
-}
-
-fn kdtree_nnodes_to_nlevels(nnodes: u32) -> u8 {
-    leftmost_significant_bit(nnodes + 1)
-}
-
-/// How far left is the most significant bit?
-/// 0b0001 would be the 0-bit
-/// 0b0011 would be the 1-bit
-/// 0b1010 would be the 3-bit
-#[inline]
-fn leftmost_significant_bit(x: u32) -> u8 {
-    assert!(
-        x > 0,
-        "x must be greater than 0 so that there is at least one flipped bit"
-    );
-    31 - x.leading_zeros() as u8
 }
 
 #[cfg(test)]

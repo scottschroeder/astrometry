@@ -12,6 +12,7 @@ log = "0.4"
 byteorder = "1"
 bytemuck = "1.7"
 strum = { version = "0.22", features = ["derive"] }
+num-traits = "0.2.14"
 
 
 

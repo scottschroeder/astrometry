@@ -1,5 +1,25 @@
 pub use super::error::Error;
 use std::str::FromStr;
+pub use self::traits::IsInteger;
+
+/*
+    Recall that    etype >= dtype >= ttype:
+    .   (etype >= dtype: because there's no point storing more precision than needed by the
+    .                    outside world;
+    .    dtype >= ttype: because there's no point keeping more precision in the splitting
+    .                    plane than exists in the data.)
+*/
+mod traits {
+    pub trait IsInteger {
+        fn is_integer() -> bool;
+    }
+
+    impl IsInteger for u32 {
+        fn is_integer() -> bool {
+            true
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct KdtType {
@@ -17,7 +37,7 @@ pub(crate) struct KdtMetadata {
     pub(crate) nnodes: usize,
     pub(crate) nbottom: usize,
     pub(crate) ninterior: usize,
-    pub(crate) nlevels: u8,
+    pub(crate) nlevels: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
