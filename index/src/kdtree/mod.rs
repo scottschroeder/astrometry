@@ -2,8 +2,8 @@ mod error;
 pub(crate) mod fits;
 pub(crate) mod kd_types;
 
-mod tree;
 pub(crate) mod bits;
+mod tree;
 
 /*
 

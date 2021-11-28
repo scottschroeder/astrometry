@@ -1,10 +1,7 @@
-use super::error::Error;
-use super::kd_types::KdtMetadata;
-use crate::kdtree::bits::compute_levels;
-use crate::kdtree::bits::node_level;
+use super::{error::Error, kd_types::KdtMetadata};
+use crate::kdtree::bits::{compute_levels, node_level};
 
 mod rangesearch;
-
 
 #[derive(Debug, Clone, Copy)]
 enum SplitDir {

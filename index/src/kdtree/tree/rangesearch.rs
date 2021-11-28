@@ -1,13 +1,10 @@
 use super::KDTree;
-use crate::kdtree::error::Error;
-use crate::kdtree::kd_types::IsInteger;
-use crate::kdtree::tree::SplitDir;
-use crate::kdtree::tree::TreeCut;
-use num_traits::Bounded;
-use num_traits::Num;
-use num_traits::NumCast;
-use num_traits::NumOps;
-use num_traits::ToPrimitive;
+use crate::kdtree::{
+    error::Error,
+    kd_types::IsInteger,
+    tree::{SplitDir, TreeCut},
+};
+use num_traits::{Bounded, Num, NumCast, NumOps, ToPrimitive};
 use std::borrow::Cow;
 
 const NODESTACK_DEFAULT_SIZE: usize = 100;

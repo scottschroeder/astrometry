@@ -82,12 +82,12 @@ pub(crate) fn max_gaussian<T: Primitive + Into<f64> + 'static>(
                     break;
                 }
             }
-            if !xflipped && dx_sign == xdir {
+            if !xflipped && (dx_sign - xdir).abs() < f64::EPSILON {
                 x += dx_sign * stepsize;
             } else {
                 xflipped = true;
             }
-            if !yflipped && dy_sign == ydir {
+            if !yflipped && (dy_sign - ydir).abs() < f64::EPSILON {
                 y += dy_sign * stepsize;
             } else {
                 yflipped = true;

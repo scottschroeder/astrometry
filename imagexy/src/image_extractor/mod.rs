@@ -451,8 +451,9 @@ fn dsigma(img: &Grayscale, sp: u32, gridsize: Option<u32>) -> f64 {
         if d == 0 {
             d = 1;
         }
-        return d;
+        d
     };
+
     let dx = set_step(img.width());
     let dy = set_step(img.height());
 
@@ -500,17 +501,18 @@ fn dsigma(img: &Grayscale, sp: u32, gridsize: Option<u32>) -> f64 {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 
     #[test]
     fn default_with_override() {
         let obj = ImageExtractor {
-            dlim: 3.14,
+            dlim: 3.3,
             ..Default::default()
         };
 
-        assert_eq!(obj.dlim, 3.14);
+        assert_eq!(obj.dlim, 3.3);
         assert_eq!(obj.plim, SIMPLEXY_DEFAULT_PLIM);
     }
 }

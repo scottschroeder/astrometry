@@ -2,11 +2,9 @@ use super::{
     bits::kdtree_nnodes_to_nlevels,
     error::Error,
     kd_types::{KdtData, KdtExt, KdtMetadata, KdtTree, KdtType},
-    tree::DimSplit,
-    tree::TreeCut,
+    tree::{DimSplit, TreeCut},
 };
-use crate::kdtree::tree::KDRange;
-use crate::kdtree::tree::KDTree;
+use crate::kdtree::tree::{KDRange, KDTree};
 use fits_rs::types::{BinTable, Header, Keyword, TableError, Value, ValueRetrievalError, HDU};
 use std::{collections::HashMap, str::FromStr};
 use strum::EnumString;

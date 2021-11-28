@@ -1,6 +1,6 @@
+pub use self::traits::IsInteger;
 pub use super::error::Error;
 use std::str::FromStr;
-pub use self::traits::IsInteger;
 
 /*
     Recall that    etype >= dtype >= ttype:

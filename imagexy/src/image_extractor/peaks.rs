@@ -217,8 +217,8 @@ pub(crate) fn dallpeaks<T: Primitive + Into<f64> + 'static>(
                 dbg_img.add_mark(obj_space(img_point), BasicColor::Red);
                 peak_points.push(img_point);
             } else if false
-                && (xci > 1 && xci < onx as u32 - 2)
-                && (yci > 1 && yci < ony as u32 - 2)
+            // && (xci > 1 && xci < onx as u32 - 2)
+            // && (yci > 1 && yci < ony as u32 - 2)
             {
                 // TODO remove this whole block
                 log::warn!(
