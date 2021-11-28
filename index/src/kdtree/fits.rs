@@ -167,7 +167,10 @@ enum TreeStyle {
 
 pub fn demo(hdu: &[HDU], tree: &str) -> anyhow::Result<()> {
     let cache = FitsFileMap::load(hdu);
-    read_fits_kdtree::<i32, f32>(&cache, Some(tree))?;
+    let stars = read_fits_kdtree::<u32, f32>(&cache, Some("stars"))?;
+    log::info!("stars: {:#?}", stars);
+    let codes = read_fits_kdtree::<u16, u16>(&cache, Some("codes"))?;
+    log::info!("codes: {:#?}", codes);
     Ok(())
 }
 
@@ -177,8 +180,9 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
 ) -> Result<KDTree<'a, T, D>, Error> {
     let (h, metadata) = find_tree(filemap.hdu, treename)?;
 
+    log::trace!("unpack lr");
     let lr_data =
-        filemap.read_chunk::<u32>(&get_table_name(treename, KD_STR_LR), metadata.nbottom, 1)?;
+        filemap.read_chunk::<u32>(&get_table_name(treename, KD_STR_LR), metadata.nbottom, 1);
 
     // let perm_data =
     //     filemap.read_chunk::<u32>(&get_table_name(treename, KD_STR_PERM), metadata.ndata, 1);
@@ -187,24 +191,25 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
 
     // if bb_data.is_ok() {
     //     todo!("nothing is implemented for bounding boxes");
-        //     let nbb_old = (metadata.nnodes + 1) / 2 - 1;
-        //     let nbb_new = metadata.nnodes;
+    //     let nbb_old = (metadata.nnodes + 1) / 2 - 1;
+    //     let nbb_new = metadata.nnodes;
 
-        //     if bb_chunk.nrows == nbb_new {
-        //     } else if bb_chunk.nrows == nbb_old {
-        //         log::warn!(
-        //             "This file contains an old, buggy {} extension, it has {} rather than {} items. This will probably cause problems!",
-        //             bb_chunk.tablename, nbb_old, nbb_new
-        //         );
-        //     } else {
-        //         log::error!(
-        //             "bounding box table {} should contain either {} (new) or {} (old) bounding boxes, but it has {}",
-        //             bb_chunk.tablename, nbb_old, nbb_new, bb_chunk.nrows
-        //         );
-        //         return Err(Error::InvalidTableDimmensions);
-        //     }
+    //     if bb_chunk.nrows == nbb_new {
+    //     } else if bb_chunk.nrows == nbb_old {
+    //         log::warn!(
+    //             "This file contains an old, buggy {} extension, it has {} rather than {} items. This will probably cause problems!",
+    //             bb_chunk.tablename, nbb_old, nbb_new
+    //         );
+    //     } else {
+    //         log::error!(
+    //             "bounding box table {} should contain either {} (new) or {} (old) bounding boxes, but it has {}",
+    //             bb_chunk.tablename, nbb_old, nbb_new, bb_chunk.nrows
+    //         );
+    //         return Err(Error::InvalidTableDimmensions);
+    //     }
     // }
 
+    log::trace!("unpack split");
     let split_data = filemap.read_chunk::<T>(
         &get_table_name(treename, KD_STR_SPLIT),
         metadata.ninterior,
@@ -217,6 +222,7 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
     //     1,
     // );
 
+    log::trace!("unpack data");
     let data_data = filemap.read_chunk::<D>(
         &get_table_name(treename, KD_STR_DATA),
         metadata.ndata,
@@ -224,6 +230,7 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
     );
 
     let range_tablename = get_table_name(treename, KD_STR_RANGE);
+    log::trace!("unpack range");
     let kdr = filemap
         .read_chunk::<f64>(range_tablename.as_str(), metadata.ndim * 2 + 1, 1)
         .map(|range| {
@@ -248,7 +255,7 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
 
     Ok(KDTree {
         metadata,
-        lr: lr_data,
+        lr: lr_data?,
         cut: TreeCut::SplitDim {
             data: split_data,
             mask,

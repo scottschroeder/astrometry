@@ -37,6 +37,28 @@ pub(crate) struct KDTree<'a, T, D> {
     // pub(crate) invscale: f64,
 }
 
+impl<'a, T, D> fmt::Debug for KDTree<'a, T, D> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KDTree")
+            .field("metadata", &self.metadata)
+            .field(
+                "lr",
+                &format_args!("&[{}; {}]", std::any::type_name::<T>(), self.lr.len()),
+            )
+            .field(
+                "data",
+                &format_args!(
+                    "&[{}; {}x{}]",
+                    std::any::type_name::<D>(),
+                    self.metadata.ndim,
+                    self.metadata.ndata
+                ),
+            )
+            .field("cut", &self.cut)
+            .finish()
+    }
+}
+
 impl<'a, T, D> KDTree<'a, T, D> {
     /// Number of data points in kdtree
     pub fn len(&self) -> usize {
@@ -237,6 +259,28 @@ pub(crate) enum TreeCut<'a, T> {
     SplitDim { data: &'a [T], mask: DimSplit },
 }
 
+impl<'a, T> fmt::Debug for TreeCut<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TreeCut::BoundingBox(data) => f
+                .debug_struct("TreeCut::BoundingBox")
+                .field(
+                    ".0",
+                    &format_args!("&[{}; {}]", std::any::type_name::<T>(), data.len()),
+                )
+                .finish(),
+            TreeCut::SplitDim { data, mask } => f
+                .debug_struct("TreeCut::SplitDim")
+                .field(
+                    "data",
+                    &format_args!("&[{}; {}]", std::any::type_name::<T>(), data.len()),
+                )
+                .field("mask", &mask)
+                .finish(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct KDRange {
     pub(crate) range: Vec<(f64, f64)>,
@@ -251,7 +295,7 @@ pub(crate) struct DimSplit {
 }
 
 impl DimSplit {
-    // fn 
+    // fn
 }
 
 impl fmt::Debug for DimSplit {
