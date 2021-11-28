@@ -167,7 +167,7 @@ impl<'a, T, D> KDTree<'a, T, D> {
         todo!()
     }
 
-    pub fn rangesearch(&self, point: usize, max_dist: f64) -> () {
+    pub fn rangesearch(&self, point: usize, max_dist: f64) {
         todo!()
     }
 

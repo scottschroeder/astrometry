@@ -1,5 +1,3 @@
-#![allow(dead_code)] // TODO remove
-
 use crate::image_extractor::ImageExtractor;
 use image::{GenericImage, GenericImageView, Pixel};
 pub(crate) use object_debugger::ImageDebugger;

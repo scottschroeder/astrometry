@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::io::Read; // TODO remove
 pub(crate) mod kdtree;
 

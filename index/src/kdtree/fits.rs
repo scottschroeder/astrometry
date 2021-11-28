@@ -6,9 +6,7 @@ use super::{
 };
 use crate::kdtree::tree::{KDRange, KDTree};
 use fits_rs::types::{BinTable, Header, Keyword, TableError, Value, ValueRetrievalError, HDU};
-use std::{collections::HashMap, str::FromStr};
-use strum::EnumString;
-use thiserror::Error as _;
+use std::str::FromStr;
 
 const FITS_ENDIAN_DETECTOR: u32 = 0x01020304;
 
@@ -165,7 +163,7 @@ enum TreeStyle {
     New,
 }
 
-pub fn demo(hdu: &[HDU], tree: &str) -> anyhow::Result<()> {
+pub fn demo(hdu: &[HDU], _tree: &str) -> anyhow::Result<()> {
     let cache = FitsFileMap::load(hdu);
     let stars = read_fits_kdtree::<u32, f32>(&cache, Some("stars"))?;
     log::info!("stars: {:#?}", stars);
@@ -178,7 +176,7 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
     filemap: &FitsFileMap<'a>,
     treename: Option<&str>,
 ) -> Result<KDTree<'a, T, D>, Error> {
-    let (h, metadata) = find_tree(filemap.hdu, treename)?;
+    let (_h, metadata) = find_tree(filemap.hdu, treename)?;
 
     log::trace!("unpack lr");
     let lr_data =
@@ -284,7 +282,7 @@ fn get_table_name(name: Option<&str>, table: &str) -> String {
     if let Some(name) = name {
         format!("{}_{}", table, name)
     } else {
-        format!("{}", table)
+        table.to_string()
     }
 }
 
