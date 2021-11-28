@@ -165,9 +165,9 @@ enum TreeStyle {
     New,
 }
 
-pub fn demo(hdu: &[HDU]) -> anyhow::Result<()> {
+pub fn demo(hdu: &[HDU], tree: &str) -> anyhow::Result<()> {
     let cache = FitsFileMap::load(hdu);
-    read_fits_kdtree::<i32, f32>(&cache, Some("stars"))?;
+    read_fits_kdtree::<i32, f32>(&cache, Some(tree))?;
     Ok(())
 }
 
@@ -178,15 +178,15 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
     let (h, metadata) = find_tree(filemap.hdu, treename)?;
 
     let lr_data =
-        filemap.read_chunk::<u32>(&get_table_name(treename, KD_STR_LR), metadata.nbottom, 1);
+        filemap.read_chunk::<u32>(&get_table_name(treename, KD_STR_LR), metadata.nbottom, 1)?;
 
-    let perm_data =
-        filemap.read_chunk::<u32>(&get_table_name(treename, KD_STR_PERM), metadata.ndata, 1);
+    // let perm_data =
+    //     filemap.read_chunk::<u32>(&get_table_name(treename, KD_STR_PERM), metadata.ndata, 1);
 
-    let bb_data = filemap.read_chunk::<T>(&get_table_name(treename, KD_STR_BB), 0, 1);
+    // let bb_data = filemap.read_chunk::<T>(&get_table_name(treename, KD_STR_BB), 0, 1);
 
-    if bb_data.is_ok() {
-        todo!("nothing is implemented for bounding boxes");
+    // if bb_data.is_ok() {
+    //     todo!("nothing is implemented for bounding boxes");
         //     let nbb_old = (metadata.nnodes + 1) / 2 - 1;
         //     let nbb_new = metadata.nnodes;
 
@@ -203,19 +203,19 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
         //         );
         //         return Err(Error::InvalidTableDimmensions);
         //     }
-    }
+    // }
 
     let split_data = filemap.read_chunk::<T>(
         &get_table_name(treename, KD_STR_SPLIT),
         metadata.ninterior,
         1,
-    );
+    )?;
 
-    let splitdim_data = filemap.read_chunk::<u8>(
-        &get_table_name(treename, KD_STR_SPLITDIM),
-        metadata.ninterior,
-        1,
-    );
+    // let splitdim_data = filemap.read_chunk::<u8>(
+    //     &get_table_name(treename, KD_STR_SPLITDIM),
+    //     metadata.ninterior,
+    //     1,
+    // );
 
     let data_data = filemap.read_chunk::<D>(
         &get_table_name(treename, KD_STR_DATA),
@@ -241,26 +241,19 @@ fn read_fits_kdtree<'a, T: bytemuck::Pod, D: bytemuck::Pod>(
             };
             log::trace!("range({}): {:?}", range_tablename, kdr);
             kdr
-        });
+        })?;
 
-    let split_data = split_data?;
-    let splitdim_data = splitdim_data?;
     let mask = compute_splitbits(metadata.ndim as u32);
+    log::debug!("{:#?}", mask);
 
     Ok(KDTree {
         metadata,
-        lr: lr_data?,
-        perm: perm_data?,
+        lr: lr_data,
         cut: TreeCut::SplitDim {
             data: split_data,
             mask,
         },
         data: data_data?,
-        splitdim: splitdim_data,
-        minval: todo!(),
-        maxval: todo!(),
-        scale: todo!(),
-        invscale: todo!(),
     })
 }
 

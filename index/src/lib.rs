@@ -3,7 +3,7 @@
 use std::io::Read; // TODO remove
 pub(crate) mod kdtree;
 
-pub fn demo(path: &str) -> anyhow::Result<()> {
+pub fn demo(path: &str, tree: &str) -> anyhow::Result<()> {
     log::debug!("reading index");
 
     let index_path = std::path::Path::new(path);
@@ -16,6 +16,6 @@ pub fn demo(path: &str) -> anyhow::Result<()> {
     for hdu in &fits.hdu {
         log::trace!("Fits Header data[{}]\n{}", hdu.data.len(), hdu.header)
     }
-    kdtree::fits::demo(fits.hdu.as_slice())?;
+    kdtree::fits::demo(fits.hdu.as_slice(), tree)?;
     Ok(())
 }

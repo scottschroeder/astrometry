@@ -1,5 +1,6 @@
 use super::{error::Error, kd_types::KdtMetadata};
 use crate::kdtree::bits::{compute_levels, node_level};
+use std::fmt;
 
 mod rangesearch;
 
@@ -22,19 +23,18 @@ pub(crate) struct KDTree<'a, T, D> {
     pub(crate) metadata: KdtMetadata,
     /// Points owned by leaf nodes
     pub(crate) lr: &'a [u32],
-    /// Permutation index
-    pub(crate) perm: &'a [u32],
+    // Permutation index
+    // pub(crate) perm: &'a [u32],
     pub(crate) cut: TreeCut<'a, T>,
     pub(crate) data: &'a [D],
-    pub(crate) splitdim: &'a [u8],
+    // pub(crate) splitdim: &'a [u8],
+    // pub(crate) minval: Option<f64>,
+    // pub(crate) maxval: Option<f64>,
 
-    pub(crate) minval: Option<f64>,
-    pub(crate) maxval: Option<f64>,
-
-    /// kdtype per real
-    pub(crate) scale: f64,
-    /// real per kdtype
-    pub(crate) invscale: f64,
+    // kdtype per real
+    // pub(crate) scale: f64,
+    // real per kdtype
+    // pub(crate) invscale: f64,
 }
 
 impl<'a, T, D> KDTree<'a, T, D> {
@@ -69,14 +69,12 @@ impl<'a, T, D> KDTree<'a, T, D> {
         KDTree {
             metadata,
             lr: todo!(),
-            perm: todo!(),
             cut: todo!(),
             data: todo!(),
-            splitdim: todo!(),
-            minval: todo!(),
-            maxval: todo!(),
-            scale: todo!(),
-            invscale: todo!(),
+            // minval: todo!(),
+            // maxval: todo!(),
+            // scale: todo!(),
+            // invscale: todo!(),
         }
     }
 
@@ -250,6 +248,20 @@ pub(crate) struct DimSplit {
     pub(crate) dimbits: u8,
     pub(crate) dimmask: u32,
     pub(crate) splitmask: u32,
+}
+
+impl DimSplit {
+    // fn 
+}
+
+impl fmt::Debug for DimSplit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DimSplit")
+            .field("dimbits", &format_args!("0x{:02x}", self.dimbits))
+            .field("dimmask", &format_args!("0x{:08x}", self.dimmask))
+            .field("splitmask", &format_args!("0x{:08x}", self.splitmask))
+            .finish()
+    }
 }
 
 pub struct BuildOptions {

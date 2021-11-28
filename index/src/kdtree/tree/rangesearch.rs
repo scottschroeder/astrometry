@@ -116,7 +116,7 @@ impl<'a, D> QueryResults<'a, D> {
     }
 }
 
-pub trait SearchableTreeType: IsInteger + Clone + NumCast + Num + Bounded {}
+pub trait SearchableTreeType: IsInteger + Clone + NumCast + Num + Bounded + ToPrimitive {}
 pub trait DataType: ToPrimitive + Clone {}
 pub trait QueryType: ToPrimitive + NumCast + NumOps + PartialOrd + Clone {}
 
@@ -214,10 +214,16 @@ where
                         !use_bboxes,
                         "told to use bounding boxes, but I don't have them"
                     );
-                    let cut_dimmension = self.splitdim[nodeid] as usize;
+                    // let cut_dimmension = self.splitdim[nodeid] as usize;
+
                     let split = &data[nodeid];
+                    let tmpsplit = <u32 as NumCast>::from(split.clone()).unwrap();
+
+                    let cut_dimmension = (tmpsplit & mask.dimmask) as usize;
+                    let split = tmpsplit & mask.splitmask;
+
                     let query_dimm_distance =
-                        check_subtract(&query.as_ref()[cut_dimmension], split);
+                        check_subtract(&query.as_ref()[cut_dimmension], &split);
                     let split_dir = if query_dimm_distance.map(|d| d < 0.0).unwrap_or(true) {
                         SplitDir::Left
                     } else {
