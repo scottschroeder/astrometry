@@ -1,6 +1,7 @@
 use super::KDTree;
 use crate::kdtree::error::Error;
 use crate::kdtree::kd_types::IsInteger;
+use crate::kdtree::tree::SplitDir;
 use crate::kdtree::tree::TreeCut;
 use num_traits::Bounded;
 use num_traits::Num;
@@ -102,15 +103,23 @@ impl<'a, D> Default for QueryResults<'a, D> {
 
 impl<'a, D> QueryResults<'a, D> {
     fn add_result(&mut self, index: usize, sdist: f64, pt: &'a [D]) {
+        assert!(
+            !sdist.is_nan(),
+            "query can not be an undefined distance away"
+        );
         self.inner.push(QueryResult {
             distance: sdist,
             data: pt,
             index,
         })
     }
+    fn sorted(&mut self) {
+        self.inner
+            .sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap())
+    }
 }
 
-pub trait SearchableTreeType: IsInteger + NumCast + Num + Bounded {}
+pub trait SearchableTreeType: IsInteger + Clone + NumCast + Num + Bounded {}
 pub trait DataType: ToPrimitive + Clone {}
 pub trait QueryType: ToPrimitive + NumCast + NumOps + PartialOrd + Clone {}
 
@@ -125,15 +134,12 @@ where
         query: Query<'_, E>,
         maxd2: f64,
         options: RangeSearchOptions,
-    ) -> Result<(), Error>
+    ) -> Result<QueryResults<D>, Error>
     where
         E: QueryType,
         [E]: ToOwned<Owned = Vec<E>>,
     {
         let mut nodestack: Vec<usize> = Vec::with_capacity(NODESTACK_DEFAULT_SIZE);
-
-        // TODO rename D to ndim?
-        let D = self.metadata.ndim;
 
         let do_dists = options.do_dists();
         if !do_dists {
@@ -159,7 +165,7 @@ where
         let mut dtl2 = 0.0;
         let mut dtlinf = 0.0;
 
-        let mut tquery = None;
+        // let mut tquery = None;
 
         let do_wholenode_check = !options.small_radius;
 
@@ -171,29 +177,8 @@ where
         let ttype_max = <f64 as NumCast>::from(T::max_value()).unwrap();
         let ttype_min = <f64 as NumCast>::from(T::min_value()).unwrap();
 
-        if T::is_integer() && (!self.bb_any() || do_precheck || do_l1precheck) {
-            tquery = self.ttype_query(&query)
-        }
-        if tquery.is_some() {
-            dtl1 = maxdist * (D as f64).sqrt();
-            dtl2 = maxd2;
-            dtlinf = maxdist;
-            tl1 = T::from(dtl1.ceil()).unwrap();
-            tlinf = T::from(dtlinf.ceil()).unwrap();
-            bigtl2 = T::from(dtl2.ceil()).unwrap();
-            use_tsplit = dtlinf < <f64 as NumCast>::from(T::max_value()).unwrap();
-        }
-
-        if do_l1precheck {
-            if dtl1 > ttype_max {
-                do_l1precheck = false
-            }
-        }
-        if T::is_integer() && tquery.is_some() && self.bb_any() {
-            if dtl2 < ttype_max {
-                use_tmath = true;
-                // else if use bigttype else warn overflow?
-            }
+        if do_l1precheck && dtl1 > ttype_max {
+            do_l1precheck = false
         }
 
         nodestack.push(0);
@@ -202,15 +187,14 @@ where
 
         while let Some(nodeid) = nodestack.pop() {
             let mut split = T::zero();
-            let mut dim = None;
             // let tlo = None;
             // let thi = None;
             if self.is_leaf(nodeid) {
-                let L = self.leaf_left(nodeid);
-                let R = self.leaf_right(nodeid);
+                let leaf_left = self.leaf_left(nodeid);
+                let leaf_right = self.leaf_right(nodeid);
 
-                for i in L..R {
-                    let data = &self.data[D * i..D * (i + 1)];
+                for i in leaf_left..leaf_right {
+                    let data = self.get_node_id(i);
                     if let Some(dqsd) = self.dist2_bailout(&query, data, maxd2) {
                         results.add_result(i, dqsd, data);
                     } else {
@@ -220,37 +204,42 @@ where
                 continue;
             }
 
-            if !self.splitdim.is_empty() {
-                dim = Some(self.splitdim[nodeid])
-            }
-
             match &self.cut {
-                crate::kdtree::tree::TreeCut::BoundingBox(b) => {
+                TreeCut::BoundingBox(b) => {
                     assert!(
                         use_bboxes,
                         "only have bounding boxes, but told not to use them"
                     );
                     todo!("I don't know how to use bboxes")
                 }
-                crate::kdtree::tree::TreeCut::SplitDim { data, mask } => {
+                TreeCut::SplitDim { data, mask } => {
                     assert!(
                         !use_bboxes,
                         "told to use bounding boxes, but I don't have them"
                     );
-                    let mut split = &data[nodeid];
-                    if self.splitdim.is_empty() && T::is_integer() {
-                        let tmpsplit = split;
-                        dim = Some(tmpsplit & mask.dimmask);
-                        split = tmpsplit & mask.splitmask;
-                        // Clipboard
-
+                    let cut_dimmension = self.splitdim[nodeid] as usize;
+                    let split = &data[nodeid];
+                    let query_dimm_distance =
+                        check_subtract(&query.as_ref()[cut_dimmension], split);
+                    let split_dir = if query_dimm_distance.map(|d| d < 0.0).unwrap_or(true) {
+                        SplitDir::Left
+                    } else {
+                        SplitDir::Right
+                    };
+                    nodestack.push(self.get_child(split_dir, nodeid));
+                    if query_dimm_distance.map(|d| d <= maxdist).unwrap_or(true) {
+                        nodestack.push(self.get_child(split_dir.swap(), nodeid));
                     }
                 }
             }
         }
 
-        todo!()
+        if options.sort_dists {
+            results.sorted();
+        }
+        Ok(results)
     }
+
     fn ttype_query<'b, E>(&self, query: &Query<'b, E>) -> Option<Query<'b, T>>
     where
         E: ToPrimitive + Clone,
@@ -318,4 +307,14 @@ where
     S: ToPrimitive,
 {
     D::from(src)
+}
+
+fn check_subtract<E, T>(a: &E, b: &T) -> Option<f64>
+where
+    T: NumCast + std::ops::Sub<Output = T> + Clone,
+    E: ToPrimitive + Clone,
+{
+    check_convert::<E, T>(a.clone())
+        .map(|a_t| a_t - b.clone())
+        .and_then(<f64 as NumCast>::from)
 }

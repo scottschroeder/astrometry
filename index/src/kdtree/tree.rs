@@ -5,6 +5,22 @@ use crate::kdtree::bits::node_level;
 
 mod rangesearch;
 
+
+#[derive(Debug, Clone, Copy)]
+enum SplitDir {
+    Left,
+    Right,
+}
+
+impl SplitDir {
+    fn swap(self) -> SplitDir {
+        match self {
+            SplitDir::Left => SplitDir::Right,
+            SplitDir::Right => SplitDir::Left,
+        }
+    }
+}
+
 pub(crate) struct KDTree<'a, T, D> {
     pub(crate) metadata: KdtMetadata,
     /// Points owned by leaf nodes
@@ -98,6 +114,11 @@ impl<'a, T, D> KDTree<'a, T, D> {
     pub fn get_data() {
         todo!("just provide a ref to data?")
     }
+
+    fn get_node_id(&self, nodeid: usize) -> &[D] {
+        &self.data[self.metadata.ndim * nodeid..self.metadata.ndim * (nodeid + 1)]
+    }
+
     pub fn kdtype_parse_data_string() {
         todo!("just use KdtMetadata struct?")
     }
@@ -209,6 +230,10 @@ impl<'a, T, D> KDTree<'a, T, D> {
             }
         }
         L - 1
+    }
+
+    fn get_child(&self, split: SplitDir, nodeid: usize) -> usize {
+        todo!()
     }
 }
 
