@@ -1,7 +1,7 @@
 use clap::Parser;
 
 pub fn get_args() -> CliOpts {
-    return CliOpts::parse();
+    CliOpts::parse()
 }
 
 #[derive(Parser, Debug)]

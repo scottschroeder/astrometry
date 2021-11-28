@@ -52,7 +52,7 @@ fn collapsing_find_minlabel(label: Label, equivs: &mut Vec<Label>) -> Label {
         equivs[label.as_index()] = min;
         label = next;
     }
-    return min;
+    min
 }
 
 pub(crate) fn dfind<T: Primitive + 'static>(
@@ -75,7 +75,7 @@ pub(crate) fn dfind<T: Primitive + 'static>(
             if ix > 0 && !is_zero(img, ix - 1, iy) {
                 // Old group
                 // TODO won't old pixel always just be the last used value? do we need to look it up?
-                object.put_pixel(ix, iy, object.get_pixel(ix - 1, iy).clone());
+                object.put_pixel(ix, iy, *object.get_pixel(ix - 1, iy));
             } else {
                 // New group
                 object.put_pixel(ix, iy, max_label.to_pixel());
@@ -119,5 +119,5 @@ pub(crate) fn dfind<T: Primitive + 'static>(
         }
     }
     // relabel
-    return Ok(object);
+    Ok(object)
 }

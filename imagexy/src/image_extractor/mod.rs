@@ -125,13 +125,10 @@ fn dump_colored_objects(img: &ImageBuffer<Luma<i32>, Vec<i32>>, name: &str) -> R
     colors.insert(-1i32, image::Rgb::from_channels(0, 0, 0, 0));
 
     let mut get_color = |obj: i32| {
-        colors
-            .entry(obj)
-            .or_insert_with(|| {
-                let [r, g, b] = random_color::RandomColor::new().to_rgb_array();
-                image::Rgb::from_channels(r, g, b, 0)
-            })
-            .clone()
+        *colors.entry(obj).or_insert_with(|| {
+            let [r, g, b] = random_color::RandomColor::new().to_rgb_array();
+            image::Rgb::from_channels(r, g, b, 0)
+        })
     };
 
     let pretty = ImageBuffer::from_fn(img.width(), img.height(), |x, y| {
@@ -162,7 +159,7 @@ impl ImageExtractor {
         let flattened_bg = if self.nobgsub {
             todo!("dont do background smoothing")
         } else {
-            flatten::flatten(&img, self.halfbox)?
+            flatten::flatten(img, self.halfbox)?
         };
         log_image(
             &flattened_bg,
@@ -294,7 +291,7 @@ fn luma_apply_mask<T: Primitive + 'static>(
         for col in 0..img.width() {
             let m = mask.get_pixel(col, row).0[0];
             if m > 0 {
-                masked.put_pixel(col, row, img.get_pixel(col, row).clone());
+                masked.put_pixel(col, row, *img.get_pixel(col, row));
             }
         }
     }
@@ -356,8 +353,8 @@ fn dsmooth2<T: Primitive + 'static>(img: &LumaImage<T>, sigma: f64) -> (LumaImag
                     let base_idx = sample - idx + half;
                     let p: f64 = NumCast::from(img.get_pixel(sample as u32, row).channels4().0)
                         .expect("could not convert to float");
-                    let o = p * kernel_1d[base_idx as usize];
-                    o
+
+                    p * kernel_1d[base_idx as usize]
                 })
                 .sum::<f64>();
             smooth.put_pixel(col, row, Pixel::from_channels(sum, 1.0, 1.0, 1.0))
@@ -376,9 +373,9 @@ fn dsmooth2<T: Primitive + 'static>(img: &LumaImage<T>, sigma: f64) -> (LumaImag
                     let base_idx = sample - idx + half;
                     // log::trace!("input[{}] * kernel[{}]", sample, base_idx);
                     let p = smooth.get_pixel(col, sample as u32).channels4().0 as f64;
-                    let o = p * kernel_1d[base_idx as usize];
+
                     // log::trace!("p:{} k:{} o:{}", p, kernel_1d[base_idx as usize], o);
-                    o
+                    p * kernel_1d[base_idx as usize]
                 })
                 .sum::<f64>();
             smoothbuf.push(sum);

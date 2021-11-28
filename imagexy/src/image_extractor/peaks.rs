@@ -100,7 +100,7 @@ where
     F: Fn(T, T) -> T,
 {
     Some(if let Some(inner) = opt {
-        cmp(inner.clone(), val)
+        cmp(inner, val)
     } else {
         val
     })
@@ -246,7 +246,7 @@ pub(crate) fn dallpeaks<T: Primitive + Into<f64> + 'static>(
                         let sdj = (yci as i32 + 2 * dj) as u32;
                         let ddj = (dj + 1) as u32;
                         log::trace!("({}, {}) -> ({}, {})", sdi, sdj, ddi, ddj);
-                        fives.put_pixel(ddi, ddj, simage.get_pixel(sdi, sdj).clone());
+                        fives.put_pixel(ddi, ddj, *simage.get_pixel(sdi, sdj));
                     }
                 }
 
@@ -299,11 +299,7 @@ fn copy_object<T: Primitive + 'static>(
             let col = oi + bounding_box.xmin as u32;
             let row = oj + bounding_box.ymin as u32;
             if obj_at(col, row) == current {
-                oimage.put_pixel(
-                    oi as u32,
-                    oj as u32,
-                    img.get_pixel(col as u32, row as u32).clone(),
-                )
+                oimage.put_pixel(oi as u32, oj as u32, *img.get_pixel(col as u32, row as u32))
             }
         }
     }
