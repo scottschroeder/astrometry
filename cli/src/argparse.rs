@@ -27,9 +27,8 @@ pub struct DemoImageXY {
 }
 #[derive(Parser, Debug)]
 pub struct DemoIndex {
-    #[clap(about = "path to astrometry.net fits file")]
+    /// path to astrometry.net fits file
     pub path: String,
-    pub tree: String,
 }
 
 #[derive(Parser, Debug)]

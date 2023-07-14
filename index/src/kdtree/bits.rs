@@ -34,7 +34,7 @@ mod tests {
         assert!(x > 0);
         let mut bit = 0;
         while x != 1 {
-            x = x >> 1;
+            x >>= 1;
             bit += 1;
         }
         bit

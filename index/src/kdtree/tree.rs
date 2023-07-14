@@ -308,9 +308,14 @@ impl fmt::Debug for DimSplit {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CutType {
+    BoudingBox,
+    Split,
+}
+
 pub struct BuildOptions {
-    bbox: bool,
-    split: bool,
+    cut: CutType,
     /* Only applicable to integer trees: use a separate array to hold the
     splitting dimension, rather than packing it into the bottom bits
     of the splitting plane location. */
@@ -319,4 +324,15 @@ pub struct BuildOptions {
     /* Twiddle the split locations so that computing LR is O(1).
     Only works for double trees or int trees with KD_BUILD_SPLITDIM. */
     linear_lr: bool,
+    // DEBUG
+    force_sort: bool,
+}
+
+impl BuildOptions {
+    pub fn bbox(&self) -> bool {
+        self.cut == CutType::BoudingBox
+    }
+    pub fn split(&self) -> bool {
+        self.cut == CutType::Split
+    }
 }

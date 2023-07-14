@@ -9,7 +9,8 @@ edition = "2021"
 imagexy = {path = "../imagexy"}
 index = {path = "../index"}
 
-clap = "3.0.0-beta.5"
+clap = {version = "3.2", features = ["derive", "cargo"]}
+
 color-backtrace = { version = "0.5" }
 pretty_env_logger = "0.4"
 

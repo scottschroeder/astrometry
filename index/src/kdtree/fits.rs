@@ -163,7 +163,7 @@ enum TreeStyle {
     New,
 }
 
-pub fn demo(hdu: &[HDU], _tree: &str) -> anyhow::Result<()> {
+pub fn demo(hdu: &[HDU]) -> anyhow::Result<()> {
     let cache = FitsFileMap::load(hdu);
     let stars = read_fits_kdtree::<u32, f32>(&cache, Some("stars"))?;
     log::info!("stars: {:#?}", stars);

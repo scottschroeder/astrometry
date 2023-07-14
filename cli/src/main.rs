@@ -22,7 +22,7 @@ fn run(args: &CliOpts) -> anyhow::Result<()> {
     match &args.subcmd {
         argparse::SubCommand::DemoImageXY(opts) => imagexy::demo(opts.path.as_str()),
         argparse::SubCommand::DemoIndex(opts) => {
-            index::demo(opts.path.as_str(), opts.tree.as_str())
+            index::demo(opts.path.as_str())
         }
         argparse::SubCommand::Gaussian(opts) => {
             imagexy::gaussian(opts.path.as_str(), opts.x, opts.y)
